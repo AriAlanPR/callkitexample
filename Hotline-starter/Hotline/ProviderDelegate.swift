@@ -32,7 +32,7 @@ class ProviderDelegate: NSObject {
         providerConfiguration.supportsVideo = true
         providerConfiguration.maximumCallsPerCallGroup = 1
         providerConfiguration.supportedHandleTypes = [.phoneNumber]
-        
+        print("La descripcion del provider configuration es \(providerConfiguration.description)")
         return providerConfiguration
     }
     
@@ -51,7 +51,7 @@ class ProviderDelegate: NSObject {
             }
             
             // 4.
-            completion?(error as? NSError)
+            completion?(error as NSError?)
         }
     }
 }
@@ -68,7 +68,7 @@ extension ProviderDelegate: CXProviderDelegate {
         
         callManager.removeAllCalls()
     }
-    //Acciones del Procider al deslizar para contestar la llamada
+    //Acciones del Provider al deslizar para contestar la llamada
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         // 1.
         guard let call = callManager.callWithUUID(uuid: action.callUUID) else {
@@ -80,6 +80,7 @@ extension ProviderDelegate: CXProviderDelegate {
         configureAudioSession()
         // 3.
         call.answer()
+        
         // 4.
         action.fulfill()
     }
@@ -105,6 +106,57 @@ extension ProviderDelegate: CXProviderDelegate {
         // 5.
         callManager.remove(call: call)
     }
+    
+    //Acciones extra del provider
+    //Cambio de status entre espera y activa
+    func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
+        guard let call = callManager.callWithUUID(uuid: action.callUUID) else {
+            action.fail()
+            return
+        }
+        
+        // 1.
+        call.state = action.isOnHold ? .held : .active
+        
+        // 2.
+        if call.state == .held {
+            stopAudio()
+        } else {
+            startAudio()
+        }
+        
+        // 3.
+        action.fulfill()
+    }
+    
+    //Actions to manage outgoing calls
+    func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        let call = Call(uuid: action.callUUID, outgoing: true, handle: action.handle.value)
+        // 1.
+        configureAudioSession()
+        // 2.
+        call.connectedStateChanged = { [weak self, weak call] in
+            guard let strongSelf = self, let call = call else { return }
+            
+            if call.connectedState == .pending {
+                strongSelf.provider.reportOutgoingCall(with: call.uuid, startedConnectingAt: nil)
+            } else if call.connectedState == .complete {
+                strongSelf.provider.reportOutgoingCall(with: call.uuid, connectedAt: nil)
+            }
+        }
+        // 3.
+        call.start { [weak self, weak call] success in
+            guard let strongSelf = self, let call = call else { return }
+            
+            if success {
+                action.fulfill()
+                strongSelf.callManager.add(call: call)
+            } else {
+                action.fail()
+            }
+        }
+    }
+
 }
 
 

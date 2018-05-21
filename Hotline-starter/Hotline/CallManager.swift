@@ -46,6 +46,14 @@ class CallManager {
     }
     callsChangedHandler?()
   }
+    
+    func setHeld(call: Call, onHold: Bool) {
+        let setHeldCallAction = CXSetHeldCallAction(call: call.uuid, onHold: onHold)
+        let transaction = CXTransaction()
+        transaction.addAction(setHeldCallAction)
+        
+        requestTransaction(transaction)
+    }
   
   func remove(call: Call) {
     guard let index = calls.index(where: { $0 === call }) else { return }
@@ -76,6 +84,18 @@ class CallManager {
                 print("Requested transaction successfully")
             }
         }
+    }
+    
+    func startCall(handle: String, videoEnabled: Bool) {
+        // 1
+        let handle = CXHandle(type: .phoneNumber, value: handle)
+        // 2
+        let startCallAction = CXStartCallAction(call: UUID(), handle: handle)
+        // 3
+        startCallAction.isVideo = videoEnabled
+        let transaction = CXTransaction(action: startCallAction)
+        
+        requestTransaction(transaction)
     }
     
 }

@@ -42,17 +42,20 @@ class CallsViewController: UITableViewController {
   }
   
   @IBAction private func unwindForNewCall(_ segue: UIStoryboardSegue) {
-    // 1.
     let newCallController = segue.source as! NewCallViewController
     guard let handle = newCallController.handle else { return }
+    let incoming = newCallController.incoming
     let videoEnabled = newCallController.videoEnabled
     
-    // 2.
-    let backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(expirationHandler: nil)
-    DispatchQueue.main.asyncAfter(wallDeadline: DispatchWallTime.now() + 1.5) {
-        AppDelegate.shared.displayIncomingCall(uuid: UUID(), handle: handle, hasVideo: videoEnabled) { _ in
-            UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
+    if incoming {
+        let backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(expirationHandler: nil)
+        DispatchQueue.main.asyncAfter(wallDeadline: DispatchWallTime.now() + 1.5) {
+            AppDelegate.shared.displayIncomingCall(uuid: UUID(), handle: handle, hasVideo: videoEnabled) { _ in
+                UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
+            }
         }
+    } else {
+        callManager.startCall(handle: handle, videoEnabled: videoEnabled)
     }
   }
   
@@ -74,6 +77,11 @@ extension CallsViewController {
     cell.callState = call.state
     cell.incoming = !call.outgoing
     
+    print("El id de la llamada es: \(call.uuid)")
+    print("La llamada se maneja con el siguiente tipo de handle: \(call.handle)")
+    print("El status de conexion de la llamada es \(call.connectedState)")
+    print("El estado de la llamada es \(call.state)")
+    
     return cell
   }
   
@@ -90,4 +98,13 @@ extension CallsViewController {
   override func tableView(_ tableView: UITableView, titleForDeleteConfirmationButtonForRowAt indexPath: IndexPath) -> String? {
     return "End"
   }
+  
+  
+  overrideo  func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let call = callManager.calls[indexPath.row]
+        call.state = call.state == .held ? .active : .held
+        callManager?.setHeld(call: call, onHold: call.state == .held)
+        
+        tableView.reloadData()
+   }
 }
